@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HackerNews AI Builder</title>
+    <link rel="stylesheet" href="style.css">
+    <script type="importmap">
+    {
+        "imports": {
+            "marked": "https://cdn.jsdelivr.net/npm/marked/lib/marked.esm.js",
+            "dompurify": "https://cdn.jsdelivr.net/npm/dompurify/dist/purify.es.min.js"
+        }
+    }
+    </script>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="logo">
+                <span class="logo-text">HN</span>
+                <span class="ai-badge">AI</span>
+            </div>
+            <h1>Hacker News</h1>
+            <p class="subtitle">Enhanced with AI Visual Applications</p>
+        </header>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Loading stories...</p>
+        </div>
+
+        <div class="story-list" id="storyList">
+            <!-- Stories will be populated here -->
+        </div>
+    </div>
+
+    <!-- AI Builder Modal -->
+    <div class="modal" id="aiModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">AI Building Application...</h2>
+                <button class="close-btn" id="closeBtn">&times;</button>
+            </div>
+            
+            <div class="ai-workspace">
+                <div class="ai-status" id="aiStatus">
+                    <div class="ai-avatar">🤖</div>
+                    <div class="status-text">Initializing AI Builder...</div>
+                </div>
+
+                <div class="build-steps" id="buildSteps">
+                    <!-- Build steps will be populated here -->
+                </div>
+
+                <div class="code-panels" id="codePanels">
+                    <!-- Code panels will be populated here -->
+                </div>
+
+                <div class="preview-container" id="previewContainer">
+                    <h3>Live Preview</h3>
+                    <div class="preview-frame">
+                        <iframe id="previewFrame" sandbox="allow-scripts allow-same-origin"></iframe>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="script.js"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>
+
