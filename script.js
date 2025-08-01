@@ -122,9 +122,12 @@ class AIBuilder {
         this.story = story;
         this.buildSteps = [
             { id: 'analyze', icon: '🔍', text: 'Analyzing story content', status: 'pending' },
+            { id: 'design', icon: '🎨', text: 'Creating design concept', status: 'pending' },
+            { id: 'assets', icon: '🖼️', text: 'Generating image assets', status: 'pending' },
             { id: 'html', icon: '📄', text: 'Generating HTML structure', status: 'pending' },
             { id: 'css', icon: '🎨', text: 'Creating visual styles', status: 'pending' },
             { id: 'javascript', icon: '⚡', text: 'Adding interactivity', status: 'pending' },
+            { id: 'optimize', icon: '⚡', text: 'Optimizing performance', status: 'pending' },
             { id: 'test', icon: '🧪', text: 'Testing application', status: 'pending' },
             { id: 'deploy', icon: '🚀', text: 'Deploying application', status: 'pending' }
         ];
@@ -134,9 +137,9 @@ class AIBuilder {
             css: '',
             javascript: ''
         };
-        
-        this.isRunning = false;
-        this.currentStepIndex = 0;
+
+        this.generatedAssets = [];
+        this.designConcept = null;
     }
     
     async start() {
@@ -165,6 +168,12 @@ class AIBuilder {
             case 'analyze':
                 await this.analyzeStory();
                 break;
+            case 'design':
+                await this.createDesignConcept();
+                break;
+            case 'assets':
+                await this.generateImageAssets();
+                break;
             case 'html':
                 await this.generateHTML();
                 break;
@@ -173,6 +182,9 @@ class AIBuilder {
                 break;
             case 'javascript':
                 await this.generateJavaScript();
+                break;
+            case 'optimize':
+                await this.optimizeApplication();
                 break;
             case 'test':
                 await this.testApplication();
@@ -188,107 +200,166 @@ class AIBuilder {
         
         await this.sleep(500);
     }
-    
+
     async analyzeStory() {
         this.updateStatus('Analyzing story content and determining application type...');
-        await this.sleep(2000);
+        await this.sleep(1000);
         
-        // Simulate AI analysis
-        const analysisText = `Analyzing "${this.story.title}"...\n\nContent type: ${this.getContentType()}\nComplexity: ${this.getComplexity()}\nRecommended UI: ${this.getRecommendedUI()}`;
+        // Use AI to analyze the story content
+        const analysis = await websim.chat.completions.create({
+            messages: [
+                {
+                    role: "system",
+                    content: `Analyze this Hacker News story and determine the best type of interactive application to build. 
+                    Respond with JSON containing: {
+                        "contentType": "data-visualization" | "interactive-demo" | "article-analysis" | "tool" | "game",
+                        "complexity": "low" | "medium" | "high",
+                        "suggestedFeatures": string[],
+                        "visualStyle": "modern" | "technical" | "playful" | "professional",
+                        "colorScheme": string,
+                        "description": string
+                    }`
+                },
+                {
+                    role: "user",
+                    content: `Title: ${this.story.title}\nScore: ${this.story.score}\nComments: ${this.story.descendants}\nURL: ${this.story.url || 'N/A'}`
+                }
+            ],
+            json: true
+        });
+
+        this.analysisResult = JSON.parse(analysis.content);
         
-        this.updateStatus('Analysis complete! Planning application architecture...');
+        const analysisText = `Analysis Complete!\n\nContent Type: ${this.analysisResult.contentType}\nComplexity: ${this.analysisResult.complexity}\nVisual Style: ${this.analysisResult.visualStyle}\nDescription: ${this.analysisResult.description}`;
+        
+        this.renderAnalysisPanel(analysisText);
+        this.updateStatus('Analysis complete! Moving to design phase...');
     }
-    
-    async generateHTML() {
-        this.updateStatus('Generating HTML structure based on story content...');
+
+    async createDesignConcept() {
+        this.updateStatus('Creating comprehensive design concept...');
+        await this.sleep(1500);
+
+        // Generate design concept using AI
+        const designPrompt = await websim.chat.completions.create({
+            messages: [
+                {
+                    role: "system",
+                    content: `Create a detailed design concept for a ${this.analysisResult.contentType} application. 
+                    Respond with JSON containing: {
+                        "layout": string,
+                        "components": string[],
+                        "interactions": string[],
+                        "imageAssets": [{"name": string, "description": string, "purpose": string}],
+                        "animations": string[]
+                    }`
+                },
+                {
+                    role: "user",
+                    content: `Story: ${this.story.title}\nStyle: ${this.analysisResult.visualStyle}\nFeatures: ${this.analysisResult.suggestedFeatures.join(', ')}`
+                }
+            ],
+            json: true
+        });
+
+        this.designConcept = JSON.parse(designPrompt.content);
         
-        // Generate HTML based on story type
+        this.renderDesignPanel();
+        this.updateStatus('Design concept created! Ready to generate assets...');
+    }
+
+    async generateImageAssets() {
+        this.updateStatus('Generating custom image assets...');
+        await this.sleep(1000);
+
+        const assets = this.designConcept.imageAssets || [
+            { name: 'hero-image', description: 'Main hero/banner image', purpose: 'visual appeal' },
+            { name: 'icon-interactive', description: 'Interactive element icon', purpose: 'UI element' },
+            { name: 'background-pattern', description: 'Subtle background pattern', purpose: 'background' }
+        ];
+
+        for (const asset of assets) {
+            this.updateStatus(`Generating ${asset.name}...`);
+            
+            try {
+                const imagePrompt = `${asset.description} for a ${this.analysisResult.visualStyle} ${this.analysisResult.contentType} application about "${this.story.title}". Style: ${this.analysisResult.colorScheme}. High quality, modern design.`;
+                
+                const result = await websim.imageGen({
+                    prompt: imagePrompt,
+                    aspect_ratio: asset.purpose === 'background' ? '16:9' : '1:1',
+                    transparent: asset.purpose === 'UI element'
+                });
+
+                this.generatedAssets.push({
+                    name: asset.name,
+                    url: result.url,
+                    description: asset.description,
+                    purpose: asset.purpose
+                });
+
+                this.renderAssetPanel(asset.name, result.url, asset.description);
+                await this.sleep(1500);
+                
+            } catch (error) {
+                console.error('Error generating image:', error);
+                this.updateStatus(`⚠️ Error generating ${asset.name}, using fallback...`);
+            }
+        }
+
+        this.updateStatus('All image assets generated successfully!');
+    }
+
+    async generateHTML() {
+        this.updateStatus('Generating comprehensive HTML structure...');
+        
         await this.sleep(2000);
         
-        this.generatedCode.html = this.generateHTMLContent();
+        this.generatedCode.html = this.generateAdvancedHTMLContent();
         this.renderCodePanel('HTML', this.generatedCode.html, '📄');
         
         await this.sleep(1000);
-        this.updateStatus('HTML structure generated successfully!');
+        this.updateStatus('HTML structure with integrated assets generated!');
     }
-    
+
     async generateCSS() {
-        this.updateStatus('Creating beautiful visual styles...');
+        this.updateStatus('Creating advanced visual styles with custom assets...');
         
         await this.sleep(2500);
         
-        this.generatedCode.css = this.generateCSSContent();
+        this.generatedCode.css = this.generateAdvancedCSSContent();
         this.renderCodePanel('CSS', this.generatedCode.css, '🎨');
         
         await this.sleep(1000);
-        this.updateStatus('Visual styles applied successfully!');
+        this.updateStatus('Advanced styling with custom assets applied!');
     }
-    
+
     async generateJavaScript() {
-        this.updateStatus('Adding interactive functionality...');
+        this.updateStatus('Adding sophisticated interactive functionality...');
         
         await this.sleep(3000);
         
-        this.generatedCode.javascript = this.generateJSContent();
+        this.generatedCode.javascript = this.generateAdvancedJSContent();
         this.renderCodePanel('JavaScript', this.generatedCode.javascript, '⚡');
         
         await this.sleep(1000);
-        this.updateStatus('Interactive features implemented!');
+        this.updateStatus('Advanced interactive features implemented!');
     }
-    
-    async testApplication() {
-        this.updateStatus('Running comprehensive tests...');
-        
+
+    async optimizeApplication() {
+        this.updateStatus('Optimizing performance and accessibility...');
         await this.sleep(2000);
         
-        // Simulate testing and potential errors
-        const hasErrors = Math.random() < 0.3; // 30% chance of errors
-        
-        if (hasErrors) {
-            await this.handleTestErrors();
-        } else {
-            this.updateStatus('All tests passed! Application is ready.');
-        }
-        
-        this.renderPreview();
-    }
-    
-    async handleTestErrors() {
-        this.updateStatus('⚠️ Errors detected! Analyzing and fixing...');
-        
-        const errors = [
-            'CSS selector conflict in line 45',
-            'JavaScript function undefined: handleClick',
-            'HTML validation error: unclosed div tag'
-        ];
-        
-        const randomError = errors[Math.floor(Math.random() * errors.length)];
-        this.renderError(randomError);
-        
-        await this.sleep(2000);
-        this.updateStatus('Fixing detected errors...');
-        
-        await this.sleep(1500);
-        this.updateStatus('Errors fixed! Re-running tests...');
-        
+        // Simulate optimization
+        this.updateStatus('✨ Optimized image loading, added accessibility features');
         await this.sleep(1000);
-        this.updateStatus('All tests passed after fixes!');
+        this.updateStatus('🚀 Performance optimization complete!');
     }
-    
-    async deployApplication() {
-        this.updateStatus('Deploying interactive application...');
+
+    generateAdvancedHTMLContent() {
+        const heroImage = this.generatedAssets.find(a => a.name === 'hero-image');
+        const iconImage = this.generatedAssets.find(a => a.name === 'icon-interactive');
         
-        await this.sleep(2000);
-        this.renderPreview();
-        
-        await this.sleep(1000);
-        this.updateStatus('🎉 Application deployed successfully! Ready for interaction.');
-    }
-    
-    generateHTMLContent() {
-        const contentType = this.getContentType();
-        
-        if (contentType === 'data-visualization') {
+        if (this.analysisResult.contentType === 'data-visualization') {
             return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -296,600 +367,1628 @@ class AIBuilder {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${this.story.title}</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="app-container">
-        <header>
-            <h1>${this.story.title}</h1>
-            <p class="story-meta">Score: ${this.story.score} | Comments: ${this.story.descendants}</p>
-        </header>
-        <div class="visualization-container">
-            <div id="chart"></div>
-            <div class="controls">
-                <button id="randomize">Generate New Data</button>
-                <button id="animate">Animate</button>
-            </div>
-        </div>
-    </div>
-</body>
-</html>`;
-        } else if (contentType === 'interactive-demo') {
-            return `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${this.story.title}</title>
-</head>
-<body>
-    <div class="demo-container">
-        <h1>${this.story.title}</h1>
-        <div class="demo-area">
-            <div class="feature-showcase">
-                <div class="feature-card" data-feature="1">
-                    <h3>Interactive Feature 1</h3>
-                    <p>Click to explore this functionality</p>
+        <header class="hero-section" ${heroImage ? `style="background-image: url('${heroImage.url}')"` : ''}>
+            <div class="hero-overlay">
+                <h1 class="hero-title">${this.story.title}</h1>
+                <div class="story-meta">
+                    <span class="score-badge">${this.story.score} points</span>
+                    <span class="comments-badge">${this.story.descendants} comments</span>
+                    <span class="author">by ${this.story.by}</span>
                 </div>
-                <div class="feature-card" data-feature="2">
-                    <h3>Dynamic Content</h3>
-                    <p>Watch this content change in real-time</p>
-                </div>
-                <div class="feature-card" data-feature="3">
-                    <h3>User Controls</h3>
-                    <p>Take control of the experience</p>
-                </div>
-            </div>
-            <div class="output-area" id="output">
-                Select a feature to see it in action!
-            </div>
-        </div>
-    </div>
-</body>
-</html>`;
-        } else {
-            return `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${this.story.title}</title>
-</head>
-<body>
-    <div class="article-container">
-        <header>
-            <h1>${this.story.title}</h1>
-            <div class="article-meta">
-                <span>By ${this.story.by}</span>
-                <span>${this.story.score} points</span>
-                <span>${this.story.descendants} comments</span>
+                <p class="hero-description">Interactive data visualization and analysis</p>
             </div>
         </header>
-        <div class="content-area">
-            <div class="main-content">
-                <p>This interactive application helps you explore the story content in an engaging way.</p>
-                <div class="interactive-elements">
-                    <button class="action-btn" id="summarize">AI Summary</button>
-                    <button class="action-btn" id="analyze">Deep Analysis</button>
-                    <button class="action-btn" id="related">Find Related</button>
+        
+        <main class="main-content">
+            <div class="visualization-section">
+                <div class="viz-header">
+                    <h2>Data Visualization</h2>
+                    <div class="viz-controls">
+                        <button class="control-btn" id="randomize" ${iconImage ? `style="background-image: url('${iconImage.url}')"` : ''}>
+                            <span>Generate Data</span>
+                        </button>
+                        <button class="control-btn" id="animate">Animate</button>
+                        <button class="control-btn" id="export">Export</button>
+                    </div>
                 </div>
-                <div class="result-area" id="results">
-                    Click any button above to interact with the content!
+                <div class="chart-container">
+                    <div id="chart" class="chart-area"></div>
+                    <div class="chart-info">
+                        <div class="info-card">
+                            <h3>Insights</h3>
+                            <div id="insights"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
+            
+            <div class="interaction-section">
+                <div class="filters">
+                    <h3>Filters & Controls</h3>
+                    <div class="filter-grid">
+                        <div class="filter-item">
+                            <label>Data Range</label>
+                            <input type="range" id="dataRange" min="10" max="100" value="50">
+                        </div>
+                        <div class="filter-item">
+                            <label>Chart Type</label>
+                            <select id="chartType">
+                                <option value="bar">Bar Chart</option>
+                                <option value="line">Line Chart</option>
+                                <option value="scatter">Scatter Plot</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
     </div>
 </body>
 </html>`;
         }
+        
+        // Enhanced interactive demo template
+        return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${this.story.title}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-wrapper">
+        <nav class="app-nav">
+            <div class="nav-brand">
+                ${iconImage ? `<img src="${iconImage.url}" alt="App Icon" class="nav-icon">` : ''}
+                <span class="nav-title">Interactive Demo</span>
+            </div>
+            <div class="nav-controls">
+                <button class="nav-btn" id="resetBtn">Reset</button>
+                <button class="nav-btn" id="helpBtn">Help</button>
+            </div>
+        </nav>
+        
+        <header class="app-header" ${heroImage ? `style="background-image: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url('${heroImage.url}')"` : ''}>
+            <div class="header-content">
+                <h1>${this.story.title}</h1>
+                <p class="subtitle">Interactive exploration of the topic</p>
+                <div class="header-stats">
+                    <div class="stat">
+                        <span class="stat-number">${this.story.score}</span>
+                        <span class="stat-label">Points</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-number">${this.story.descendants}</span>
+                        <span class="stat-label">Comments</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+        <main class="app-main">
+            <div class="feature-showcase">
+                <div class="feature-grid">
+                    <div class="feature-card interactive" data-feature="realtime">
+                        <div class="feature-icon">📊</div>
+                        <h3>Real-time Data</h3>
+                        <p>Experience live data updates and interactions</p>
+                        <div class="feature-preview" id="realtimePreview"></div>
+                    </div>
+                    
+                    <div class="feature-card interactive" data-feature="customization">
+                        <div class="feature-icon">🎨</div>
+                        <h3>Customization</h3>
+                        <p>Personalize your experience with custom settings</p>
+                        <div class="feature-preview" id="customPreview"></div>
+                    </div>
+                    
+                    <div class="feature-card interactive" data-feature="analytics">
+                        <div class="feature-icon">📈</div>
+                        <h3>Analytics</h3>
+                        <p>Deep insights and analytical tools</p>
+                        <div class="feature-preview" id="analyticsPreview"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="demo-area">
+                <div class="demo-sidebar">
+                    <h3>Controls</h3>
+                    <div class="control-panel" id="controlPanel">
+                        <!-- Dynamic controls will be added here -->
+                    </div>
+                </div>
+                
+                <div class="demo-content">
+                    <div class="content-header">
+                        <h2 id="demoTitle">Select a feature to begin</h2>
+                        <div class="demo-actions">
+                            <button class="action-btn primary" id="startDemo">Start Demo</button>
+                            <button class="action-btn secondary" id="saveConfig">Save</button>
+                        </div>
+                    </div>
+                    <div class="demo-canvas" id="demoCanvas">
+                        <div class="placeholder-content">
+                            <div class="placeholder-icon">🚀</div>
+                            <p>Choose a feature from above to see it in action</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>`;
     }
-    
-    generateCSSContent() {
+
+    generateAdvancedCSSContent() {
+        const backgroundPattern = this.generatedAssets.find(a => a.name === 'background-pattern');
+        const heroImage = this.generatedAssets.find(a => a.name === 'hero-image');
+        
         return `* {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
 }
 
+:root {
+    --primary-color: ${this.analysisResult.colorScheme || '#667eea'};
+    --secondary-color: #764ba2;
+    --accent-color: #4ecdc4;
+    --success-color: #2ecc71;
+    --warning-color: #f39c12;
+    --danger-color: #e74c3c;
+    --dark-color: #2c3e50;
+    --light-color: #ecf0f1;
+    --text-color: #333;
+    --text-light: #666;
+    --border-radius: 12px;
+    --box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    line-height: 1.6;
+    color: var(--text-color);
+    background: ${backgroundPattern ? `url('${backgroundPattern.url}')` : 'linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%)'};
+    background-attachment: fixed;
     min-height: 100vh;
-    color: #333;
 }
 
-.app-container, .demo-container, .article-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 20px;
+.app-container, .app-wrapper {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
 }
 
-header {
-    text-align: center;
-    margin-bottom: 40px;
+/* Navigation Styles */
+.app-nav {
     background: rgba(255, 255, 255, 0.95);
-    padding: 30px;
-    border-radius: 20px;
     backdrop-filter: blur(10px);
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    position: sticky;
+    top: 0;
+    z-index: 100;
 }
 
-h1 {
-    font-size: 2.5rem;
-    margin-bottom: 15px;
-    background: linear-gradient(45deg, #667eea, #764ba2);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-}
-
-.story-meta, .article-meta {
-    color: #666;
-    font-size: 1rem;
-}
-
-.visualization-container {
-    background: rgba(255, 255, 255, 0.95);
-    border-radius: 20px;
-    padding: 30px;
-    backdrop-filter: blur(10px);
-}
-
-#chart {
-    width: 100%;
-    height: 400px;
-    background: #f8f9fa;
-    border: 2px dashed #ddd;
-    border-radius: 15px;
+.nav-brand {
     display: flex;
     align-items: center;
-    justify-content: center;
-    font-size: 1.2rem;
-    color: #666;
-    margin-bottom: 20px;
+    gap: 0.75rem;
+    font-weight: 600;
+    font-size: 1.125rem;
 }
 
-.controls {
+.nav-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+}
+
+.nav-controls {
     display: flex;
-    gap: 15px;
-    justify-content: center;
+    gap: 0.5rem;
 }
 
-.controls button, .action-btn {
-    background: linear-gradient(45deg, #4ecdc4, #44a08d);
+.nav-btn {
+    background: var(--primary-color);
     color: white;
     border: none;
-    padding: 12px 24px;
-    border-radius: 25px;
-    font-size: 1rem;
-    font-weight: 600;
+    padding: 0.5rem 1rem;
+    border-radius: var(--border-radius);
+    font-size: 0.875rem;
+    font-weight: 500;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: var(--transition);
 }
 
-.controls button:hover, .action-btn:hover {
+.nav-btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.demo-area {
-    background: rgba(255, 255, 255, 0.95);
-    border-radius: 20px;
-    padding: 30px;
-    backdrop-filter: blur(10px);
-}
-
-.feature-showcase {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 20px;
-    margin-bottom: 30px;
-}
-
-.feature-card {
-    background: linear-gradient(135deg, #ff6b6b, #ffd93d);
+/* Hero Section */
+.hero-section, .app-header {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    background-size: cover;
+    background-position: center;
     color: white;
-    padding: 25px;
-    border-radius: 15px;
-    cursor: pointer;
-    transition: all 0.3s ease;
+    padding: 4rem 2rem;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
 }
 
-.feature-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+.hero-overlay {
+    background: rgba(0, 0, 0, 0.4);
+    padding: 2rem;
+    border-radius: var(--border-radius);
+    backdrop-filter: blur(5px);
 }
 
-.feature-card h3 {
-    margin-bottom: 10px;
-    font-size: 1.3rem;
+.hero-title, .app-header h1 {
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 700;
+    margin-bottom: 1rem;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-.output-area, .result-area {
-    background: #f8f9fa;
-    padding: 25px;
-    border-radius: 15px;
-    min-height: 200px;
-    font-size: 1.1rem;
-    line-height: 1.6;
-}
-
-.content-area {
-    background: rgba(255, 255, 255, 0.95);
-    border-radius: 20px;
-    padding: 30px;
-    backdrop-filter: blur(10px);
-}
-
-.interactive-elements {
+.story-meta, .header-stats {
     display: flex;
-    gap: 15px;
-    margin: 20px 0;
+    justify-content: center;
+    gap: 1.5rem;
+    margin: 1.5rem 0;
     flex-wrap: wrap;
 }
 
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
+.score-badge, .comments-badge {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-weight: 600;
+    backdrop-filter: blur(5px);
+}
+
+.stat {
+    text-align: center;
+}
+
+.stat-number {
+    display: block;
+    font-size: 2rem;
+    font-weight: 700;
+}
+
+.stat-label {
+    font-size: 0.875rem;
+    opacity: 0.8;
+}
+
+/* Main Content */
+.main-content, .app-main {
+    flex: 1;
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+/* Feature Showcase */
+.feature-showcase {
+    margin-bottom: 3rem;
+}
+
+.feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.feature-card {
+    background: rgba(255, 255, 255, 0.95);
+    padding: 2rem;
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    transition: var(--transition);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+}
+
+.feature-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
+    transform: scaleX(0);
+    transition: var(--transition);
+}
+
+.feature-card:hover::before {
+    transform: scaleX(1);
+}
+
+.feature-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+
+.feature-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+.feature-card h3 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+    color: var(--dark-color);
+}
+
+.feature-preview {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: var(--light-color);
+    border-radius: 8px;
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875rem;
+    color: var(--text-light);
+}
+
+/* Demo Area */
+.demo-area {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 2rem;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: var(--border-radius);
+    padding: 2rem;
+    box-shadow: var(--box-shadow);
+    backdrop-filter: blur(10px);
+}
+
+.demo-sidebar {
+    background: var(--light-color);
+    padding: 1.5rem;
+    border-radius: var(--border-radius);
+}
+
+.control-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.demo-content {
+    display: flex;
+    flex-direction: column;
+}
+
+.content-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--light-color);
+}
+
+.demo-actions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.action-btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: var(--border-radius);
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.action-btn.primary {
+    background: var(--primary-color);
+    color: white;
+}
+
+.action-btn.secondary {
+    background: transparent;
+    color: var(--primary-color);
+    border: 2px solid var(--primary-color);
+}
+
+.action-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.demo-canvas {
+    flex: 1;
+    background: white;
+    border-radius: var(--border-radius);
+    border: 2px dashed var(--light-color);
+    min-height: 400px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.placeholder-content {
+    text-align: center;
+    color: var(--text-light);
+}
+
+.placeholder-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+}
+
+/* Visualization Styles */
+.visualization-section {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: var(--border-radius);
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--box-shadow);
+    backdrop-filter: blur(10px);
+}
+
+.viz-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--light-color);
+}
+
+.viz-controls {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.control-btn {
+    background: linear-gradient(45deg, var(--accent-color), #44a08d);
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 25px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background-size: 20px;
+    background-repeat: no-repeat;
+    background-position: 10px center;
+    padding-left: 2.5rem;
+}
+
+.control-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+.chart-container {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 2rem;
+}
+
+.chart-area {
+    background: white;
+    border: 2px solid var(--light-color);
+    border-radius: var(--border-radius);
+    min-height: 400px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.info-card {
+    background: var(--light-color);
+    padding: 1.5rem;
+    border-radius: var(--border-radius);
+    height: fit-content;
+}
+
+/* Filter Section */
+.interaction-section {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: var(--border-radius);
+    padding: 2rem;
+    box-shadow: var(--box-shadow);
+    backdrop-filter: blur(10px);
+}
+
+.filter-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+
+.filter-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.filter-item label {
+    font-weight: 600;
+    color: var(--dark-color);
+}
+
+.filter-item input,
+.filter-item select {
+    padding: 0.75rem;
+    border: 2px solid var(--light-color);
+    border-radius: var(--border-radius);
+    font-size: 1rem;
+    transition: var(--transition);
+}
+
+.filter-item input:focus,
+.filter-item select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+/* Animations */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .animated {
-    animation: fadeIn 0.6s ease-out;
+    animation: fadeInUp 0.6s ease-out;
 }
 
-@media (max-width: 768px) {
-    .interactive-elements {
-        flex-direction: column;
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
     }
-    
-    .feature-showcase {
+    50% {
+        opacity: 0.7;
+    }
+}
+
+.loading {
+    animation: pulse 2s infinite;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .demo-area {
         grid-template-columns: 1fr;
     }
     
-    h1 {
-        font-size: 1.8rem;
+    .chart-container {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .main-content, .app-main {
+        padding: 1rem;
+    }
+    
+    .hero-section, .app-header {
+        padding: 2rem 1rem;
+    }
+    
+    .story-meta, .header-stats {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    .viz-header {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: stretch;
+    }
+    
+    .viz-controls {
+        justify-content: center;
+    }
+    
+    .content-header {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: stretch;
+    }
+}
+
+@media (max-width: 480px) {
+    .feature-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .filter-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .control-btn {
+        padding: 0.5rem 1rem;
+        font-size: 0.875rem;
     }
 }`;
     }
-    
-    generateJSContent() {
-        const contentType = this.getContentType();
+
+    generateAdvancedJSContent() {
+        const contentType = this.analysisResult.contentType;
         
-        if (contentType === 'data-visualization') {
-            return `document.addEventListener('DOMContentLoaded', function() {
-    let data = generateRandomData();
+        return `document.addEventListener('DOMContentLoaded', function() {
+    console.log('Advanced ${contentType} application initialized');
     
-    function generateRandomData() {
-        return Array.from({length: 20}, (_, i) => ({
-            x: i,
-            y: Math.random() * 100 + 10
-        }));
-    }
+    // Application state management
+    const AppState = {
+        currentFeature: null,
+        settings: {
+            theme: '${this.analysisResult.visualStyle}',
+            animations: true,
+            autoUpdate: false
+        },
+        data: null,
+        isLoading: false
+    };
     
-    function renderChart() {
-        const svg = d3.select('#chart').html('').append('svg')
-            .attr('width', '100%')
-            .attr('height', '100%');
-            
-        const width = 800;
-        const height = 350;
+    // Utility functions
+    const Utils = {
+        debounce: (func, wait) => {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        },
         
-        const xScale = d3.scaleLinear()
-            .domain([0, data.length - 1])
-            .range([50, width - 50]);
-            
-        const yScale = d3.scaleLinear()
-            .domain([0, d3.max(data, d => d.y)])
-            .range([height - 50, 50]);
-            
-        // Draw bars
-        svg.selectAll('rect')
-            .data(data)
-            .enter()
-            .append('rect')
-            .attr('x', (d, i) => xScale(i) - 15)
-            .attr('y', d => yScale(d.y))
-            .attr('width', 30)
-            .attr('height', d => height - 50 - yScale(d.y))
-            .attr('fill', (d, i) => \`hsl(\${i * 18}, 70%, 60%)\`)
-            .on('mouseover', function(event, d) {
-                d3.select(this).attr('opacity', 0.7);
-            })
-            .on('mouseout', function() {
-                d3.select(this).attr('opacity', 1);
-            });
-    }
+        animate: (element, keyframes, options = {}) => {
+            if (!AppState.settings.animations) return Promise.resolve();
+            return element.animate(keyframes, {
+                duration: 300,
+                easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+                fill: 'forwards',
+                ...options
+            }).finished;
+        },
+        
+        generateData: (count = 20) => {
+            return Array.from({length: count}, (_, i) => ({
+                id: i,
+                x: i,
+                y: Math.random() * 100 + 10,
+                category: ['A', 'B', 'C', 'D'][Math.floor(Math.random() * 4)],
+                value: Math.random() * 1000 + 100,
+                timestamp: new Date(Date.now() - Math.random() * 86400000 * 30)
+            }));
+        }
+    };
     
-    document.getElementById('randomize').addEventListener('click', function() {
-        data = generateRandomData();
-        renderChart();
+    ${contentType === 'data-visualization' ? this.generateVisualizationJS() : this.generateInteractiveJS()}
+    
+    // Global event handlers
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            resetApplication();
+        } else if (e.key === 'r' && e.ctrlKey) {
+            e.preventDefault();
+            refreshData();
+        }
     });
     
-    document.getElementById('animate').addEventListener('click', function() {
-        const svg = d3.select('#chart svg');
-        svg.selectAll('rect')
-            .transition()
-            .duration(1000)
-            .attr('height', d => Math.random() * 200 + 50);
-    });
+    // Initialize application
+    initializeApplication();
     
-    renderChart();
-});`;
-        } else if (contentType === 'interactive-demo') {
-            return `document.addEventListener('DOMContentLoaded', function() {
-    const output = document.getElementById('output');
-    const features = document.querySelectorAll('.feature-card');
-    
-    const demos = {
-        '1': function() {
-            output.innerHTML = \`
-                <h3>Interactive Feature Demo</h3>
-                <div style="margin: 20px 0;">
-                    <input type="range" id="slider" min="0" max="100" value="50" style="width: 100%;">
-                    <p>Value: <span id="value">50</span></p>
-                </div>
-                <div id="visual" style="width: 100%; height: 100px; background: linear-gradient(90deg, #ff6b6b, #4ecdc4); border-radius: 10px; margin-top: 20px;"></div>
-            \`;
-            
-            const slider = document.getElementById('slider');
-            const valueSpan = document.getElementById('value');
-            const visual = document.getElementById('visual');
-            
-            slider.addEventListener('input', function() {
-                valueSpan.textContent = this.value;
-                visual.style.opacity = this.value / 100;
-            });
-        },
-        '2': function() {
-            output.innerHTML = \`
-                <h3>Dynamic Content Generator</h3>
-                <button id="generate" style="margin: 20px 0; padding: 10px 20px; background: #4ecdc4; color: white; border: none; border-radius: 5px; cursor: pointer;">Generate Content</button>
-                <div id="dynamic-content"></div>
-            \`;
-            
-            document.getElementById('generate').addEventListener('click', function() {
-                const content = document.getElementById('dynamic-content');
-                const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57'];
-                const randomColor = colors[Math.floor(Math.random() * colors.length)];
-                
-                content.innerHTML += \`
-                    <div style="background: \${randomColor}; color: white; padding: 15px; margin: 10px 0; border-radius: 10px; animation: fadeIn 0.5s ease;">
-                        <h4>Dynamic Item \${Date.now()}</h4>
-                        <p>Generated at: \${new Date().toLocaleTimeString()}</p>
-                    </div>
-                \`;
-            });
-        },
-        '3': function() {
-            output.innerHTML = \`
-                <h3>User Control Panel</h3>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin: 20px 0;">
-                    <button class="control-btn" data-action="bg-change">Change Background</button>
-                    <button class="control-btn" data-action="text-size">Toggle Text Size</button>
-                    <button class="control-btn" data-action="theme">Switch Theme</button>
-                    <button class="control-btn" data-action="animate">Animate Elements</button>
-                </div>
-                <div id="controlled-area" style="padding: 20px; background: #f8f9fa; border-radius: 10px; transition: all 0.3s ease;">
-                    <p>This area responds to your controls!</p>
-                </div>
-            \`;
-            
-            document.querySelectorAll('.control-btn').forEach(btn => {
-                btn.style.cssText = 'padding: 10px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer; transition: all 0.3s ease;';
-                
-                btn.addEventListener('click', function() {
-                    const action = this.dataset.action;
-                    const area = document.getElementById('controlled-area');
-                    
-                    switch(action) {
-                        case 'bg-change':
-                            area.style.background = \`hsl(\${Math.random() * 360}, 70%, 90%)\`;
-                            break;
-                        case 'text-size':
-                            area.style.fontSize = area.style.fontSize === '1.5rem' ? '1rem' : '1.5rem';
-                            break;
-                        case 'theme':
-                            area.style.color = area.style.color === 'white' ? 'black' : 'white';
-                            area.style.background = area.style.background.includes('333') ? '#f8f9fa' : '#333';
-                            break;
-                        case 'animate':
-                            area.style.transform = 'rotate(5deg) scale(1.1)';
-                            setTimeout(() => area.style.transform = 'none', 500);
-                            break;
+    function initializeApplication() {
+        console.log('Initializing advanced application...');
+        
+        // Setup performance monitoring
+        if ('performance' in window) {
+            const observer = new PerformanceObserver((list) => {
+                list.getEntries().forEach((entry) => {
+                    if (entry.entryType === 'measure') {
+                        console.log(\`Performance: \${entry.name} took \${entry.duration}ms\`);
                     }
                 });
             });
+            observer.observe({entryTypes: ['measure']});
         }
-    };
-    
-    features.forEach(feature => {
-        feature.addEventListener('click', function() {
-            const featureId = this.dataset.feature;
-            if (demos[featureId]) {
-                demos[featureId]();
-                output.classList.add('animated');
-                setTimeout(() => output.classList.remove('animated'), 600);
-            }
+        
+        // Setup error handling
+        window.addEventListener('error', (e) => {
+            console.error('Application error:', e.error);
+            showNotification('An error occurred. Please refresh the page.', 'error');
         });
-    });
-});`;
-        } else {
-            return `document.addEventListener('DOMContentLoaded', function() {
-    const buttons = document.querySelectorAll('.action-btn');
-    const results = document.getElementById('results');
+        
+        // Setup offline detection
+        window.addEventListener('online', () => {
+            showNotification('Connection restored', 'success');
+        });
+        
+        window.addEventListener('offline', () => {
+            showNotification('Working offline', 'warning');
+        });
+        
+        // Load saved settings
+        loadSettings();
+        
+        // Start main application logic
+        ${contentType === 'data-visualization' ? 'initializeVisualization();' : 'initializeInteractiveDemo();'}
+    }
     
-    const actions = {
-        summarize: function() {
-            results.innerHTML = \`
-                <h3>AI Summary</h3>
-                <div class="summary-content">
-                    <p>🤖 Analyzing story: "\${'${this.story.title}'}"</p>
-                    <div class="loading-dots">
-                        <span>.</span><span>.</span><span>.</span>
-                    </div>
-                </div>
-            \`;
-            
-            setTimeout(() => {
-                results.innerHTML = \`
-                    <h3>AI Summary</h3>
-                    <div class="summary-result">
-                        <p><strong>Key Points:</strong></p>
-                        <ul>
-                            <li>Story has \${${this.story.score}} points and \${${this.story.descendants}} comments</li>
-                            <li>Posted by \${'${this.story.by}'}</li>
-                            <li>High engagement indicates significant community interest</li>
-                            <li>Content appears to be relevant to current tech discussions</li>
-                        </ul>
-                        <p><strong>Sentiment:</strong> Generally positive community response</p>
+    function loadSettings() {
+        try {
+            const saved = localStorage.getItem('app-settings');
+            if (saved) {
+                Object.assign(AppState.settings, JSON.parse(saved));
+            }
+        } catch (e) {
+            console.warn('Could not load settings:', e);
+        }
+    }
+    
+    function saveSettings() {
+        try {
+            localStorage.setItem('app-settings', JSON.stringify(AppState.settings));
+        } catch (e) {
+            console.warn('Could not save settings:', e);
+        }
+    }
+    
+    function showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = \`notification notification-\${type}\`;
+        notification.textContent = message;
+        
+        Object.assign(notification.style, {
+            position: 'fixed',
+            top: '20px',
+            right: '20px',
+            padding: '1rem 1.5rem',
+            borderRadius: '8px',
+            color: 'white',
+            zIndex: '1000',
+            opacity: '0',
+            transform: 'translateY(-20px)',
+            transition: 'all 0.3s ease'
+        });
+        
+        const colors = {
+            info: '#3498db',
+            success: '#2ecc71',
+            warning: '#f39c12',
+            error: '#e74c3c'
+        };
+        
+        notification.style.background = colors[type] || colors.info;
+        
+        document.body.appendChild(notification);
+        
+        requestAnimationFrame(() => {
+            notification.style.opacity = '1';
+            notification.style.transform = 'translateY(0)';
+        });
+        
+        setTimeout(() => {
+            notification.style.opacity = '0';
+            notification.style.transform = 'translateY(-20px)';
+            setTimeout(() => notification.remove(), 300);
+        }, 3000);
+    }
+    
+    function resetApplication() {
+        AppState.currentFeature = null;
+        AppState.data = null;
+        
+        // Reset UI
+        const canvas = document.getElementById('demoCanvas') || document.getElementById('chart');
+        if (canvas) {
+            canvas.innerHTML = '';
+            if (canvas.id === 'demoCanvas') {
+                canvas.innerHTML = \`
+                    <div class="placeholder-content">
+                        <div class="placeholder-icon">🚀</div>
+                        <p>Choose a feature from above to see it in action</p>
                     </div>
                 \`;
-            }, 2000);
-        },
-        
-        analyze: function() {
-            results.innerHTML = \`
-                <h3>Deep Analysis</h3>
-                <div class="analysis-content">
-                    <div class="metric">
-                        <span class="label">Engagement Score:</span>
-                        <div class="bar">
-                            <div class="fill" style="width: \${Math.min((${this.story.score} / 100) * 100, 100)}%"></div>
-                        </div>
-                        <span>\${${this.story.score}} points</span>
-                    </div>
-                    <div class="metric">
-                        <span class="label">Discussion Level:</span>
-                        <div class="bar">
-                            <div class="fill" style="width: \${Math.min((${this.story.descendants} / 50) * 100, 100)}%"></div>
-                        </div>
-                        <span>\${${this.story.descendants}} comments</span>
-                    </div>
-                    <div class="insights">
-                        <h4>Insights:</h4>
-                        <p>This story shows \${${this.story.score} > 100 ? 'high' : 'moderate'} community engagement.</p>
-                        <p>Discussion level is \${${this.story.descendants} > 50 ? 'very active' : 'moderate'}.</p>
-                    </div>
-                </div>
-            \`;
-        },
-        
-        related: function() {
-            results.innerHTML = \`
-                <h3>Related Content</h3>
-                <div class="related-content">
-                    <p>Finding stories related to: "\${'${this.story.title}'}"</p>
-                    <div class="related-list">
-                        <div class="related-item">
-                            <h4>Similar Story #1</h4>
-                            <p>A related discussion from yesterday...</p>
-                            <span class="related-score">45 points</span>
-                        </div>
-                        <div class="related-item">
-                            <h4>Similar Story #2</h4>
-                            <p>Another perspective on the same topic...</p>
-                            <span class="related-score">78 points</span>
-                        </div>
-                        <div class="related-item">
-                            <h4>Similar Story #3</h4>
-                            <p>Follow-up discussion thread...</p>
-                            <span class="related-score">32 points</span>
-                        </div>
-                    </div>
-                </div>
-            \`;
+            }
         }
-    };
+        
+        showNotification('Application reset', 'info');
+    }
     
-    buttons.forEach(button => {
-        button.addEventListener('click', function() {
-            const action = this.id;
-            if (actions[action]) {
-                actions[action]();
-                results.classList.add('animated');
-                setTimeout(() => results.classList.remove('animated'), 600);
+    function refreshData() {
+        performance.mark('data-refresh-start');
+        AppState.data = Utils.generateData();
+        performance.mark('data-refresh-end');
+        performance.measure('data-refresh', 'data-refresh-start', 'data-refresh-end');
+        
+        showNotification('Data refreshed', 'success');
+        
+        // Trigger data update events
+        document.dispatchEvent(new CustomEvent('dataUpdated', {
+            detail: { data: AppState.data }
+        }));
+    }
+});`;
+    }
+
+    generateVisualizationJS() {
+        return `
+    // Advanced Data Visualization Logic
+    let chart, data, scales, animations;
+    
+    function initializeVisualization() {
+        data = Utils.generateData(50);
+        setupVisualization();
+        bindVisualizationEvents();
+        renderChart();
+    }
+    
+    function setupVisualization() {
+        const chartElement = document.getElementById('chart');
+        if (!chartElement) return;
+        
+        // Create SVG
+        const svg = d3.select('#chart')
+            .html('')
+            .append('svg')
+            .attr('width', '100%')
+            .attr('height', '100%')
+            .attr('viewBox', '0 0 800 400');
+            
+        // Setup scales
+        scales = {
+            x: d3.scaleLinear().domain([0, data.length - 1]).range([60, 740]),
+            y: d3.scaleLinear().domain([0, d3.max(data, d => d.y)]).range([360, 40]),
+            color: d3.scaleOrdinal(d3.schemeCategory10)
+        };
+        
+        // Add gradients
+        const defs = svg.append('defs');
+        const gradient = defs.append('linearGradient')
+            .attr('id', 'chartGradient')
+            .attr('gradientUnits', 'userSpaceOnUse')
+            .attr('x1', 0).attr('y1', 360)
+            .attr('x2', 0).attr('y2', 40);
+            
+        gradient.append('stop')
+            .attr('offset', '0%')
+            .attr('stop-color', '#4ecdc4')
+            .attr('stop-opacity', 0.8);
+            
+        gradient.append('stop')
+            .attr('offset', '100%')
+            .attr('stop-color', '#44a08d')
+            .attr('stop-opacity', 0.2);
+    }
+    
+    function renderChart() {
+        const svg = d3.select('#chart svg');
+        const chartType = document.getElementById('chartType')?.value || 'bar';
+        
+        // Clear previous chart
+        svg.selectAll('.chart-element').remove();
+        
+        performance.mark('chart-render-start');
+        
+        if (chartType === 'bar') {
+            renderBarChart(svg);
+        } else if (chartType === 'line') {
+            renderLineChart(svg);
+        } else if (chartType === 'scatter') {
+            renderScatterPlot(svg);
+        }
+        
+        performance.mark('chart-render-end');
+        performance.measure('chart-render', 'chart-render-start', 'chart-render-end');
+        
+        updateInsights();
+    }
+    
+    function renderBarChart(svg) {
+        const bars = svg.selectAll('.bar')
+            .data(data)
+            .enter()
+            .append('rect')
+            .attr('class', 'chart-element bar')
+            .attr('x', (d, i) => scales.x(i) - 8)
+            .attr('y', scales.y(0))
+            .attr('width', 16)
+            .attr('height', 0)
+            .attr('fill', 'url(#chartGradient)')
+            .attr('rx', 4);
+            
+        bars.transition()
+            .duration(800)
+            .delay((d, i) => i * 20)
+            .attr('y', d => scales.y(d.y))
+            .attr('height', d => scales.y(0) - scales.y(d.y));
+            
+        // Add interactivity
+        bars.on('mouseover', function(event, d) {
+            d3.select(this).attr('opacity', 0.7);
+            showTooltip(event, d);
+        })
+        .on('mouseout', function() {
+            d3.select(this).attr('opacity', 1);
+            hideTooltip();
+        });
+    }
+    
+    function renderLineChart(svg) {
+        const line = d3.line()
+            .x((d, i) => scales.x(i))
+            .y(d => scales.y(d.y))
+            .curve(d3.curveCardinal);
+            
+        const path = svg.append('path')
+            .datum(data)
+            .attr('class', 'chart-element line')
+            .attr('fill', 'none')
+            .attr('stroke', '#4ecdc4')
+            .attr('stroke-width', 3)
+            .attr('d', line);
+            
+        const totalLength = path.node().getTotalLength();
+        
+        path.attr('stroke-dasharray', totalLength + ' ' + totalLength)
+            .attr('stroke-dashoffset', totalLength)
+            .transition()
+            .duration(1500)
+            .attr('stroke-dashoffset', 0);
+            
+        // Add data points
+        svg.selectAll('.dot')
+            .data(data)
+            .enter()
+            .append('circle')
+            .attr('class', 'chart-element dot')
+            .attr('cx', (d, i) => scales.x(i))
+            .attr('cy', d => scales.y(d.y))
+            .attr('r', 0)
+            .attr('fill', '#44a08d')
+            .transition()
+            .duration(500)
+            .delay((d, i) => 1500 + i * 30)
+            .attr('r', 4);
+    }
+    
+    function renderScatterPlot(svg) {
+        const circles = svg.selectAll('.dot')
+            .data(data)
+            .enter()
+            .append('circle')
+            .attr('class', 'chart-element dot')
+            .attr('cx', (d, i) => scales.x(i))
+            .attr('cy', d => scales.y(d.y))
+            .attr('r', 0)
+            .attr('fill', d => scales.color(d.category))
+            .attr('opacity', 0.7);
+            
+        circles.transition()
+            .duration(600)
+            .delay((d, i) => i * 40)
+            .attr('r', d => Math.sqrt(d.value) / 5);
+    }
+    
+    function bindVisualizationEvents() {
+        document.getElementById('randomize')?.addEventListener('click', () => {
+            data = Utils.generateData(parseInt(document.getElementById('dataRange')?.value) || 50);
+            scales.y.domain([0, d3.max(data, d => d.y)]);
+            renderChart();
+        });
+        
+        document.getElementById('animate')?.addEventListener('click', () => {
+            animateChart();
+        });
+        
+        document.getElementById('export')?.addEventListener('click', () => {
+            exportChart();
+        });
+        
+        document.getElementById('dataRange')?.addEventListener('input', Utils.debounce((e) => {
+            data = Utils.generateData(parseInt(e.target.value));
+            scales.y.domain([0, d3.max(data, d => d.y)]);
+            renderChart();
+        }, 300));
+        
+        document.getElementById('chartType')?.addEventListener('change', (e) => {
+            renderChart();
+        });
+    }
+    
+    function animateChart() {
+        const svg = d3.select('#chart svg');
+        svg.selectAll('.chart-element')
+            .transition()
+            .duration(1000)
+            .attr('transform', 'scale(1.1)')
+            .transition()
+            .duration(1000)
+            .attr('transform', 'scale(1)');
+    }
+    
+    function exportChart() {
+        const svg = document.querySelector('#chart svg');
+        const serializer = new XMLSerializer();
+        const source = serializer.serializeToString(svg);
+        
+        const blob = new Blob([source], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'chart.svg';
+        a.click();
+        
+        URL.revokeObjectURL(url);
+        showNotification('Chart exported successfully', 'success');
+    }
+    
+    function updateInsights() {
+        const insights = document.getElementById('insights');
+        if (!insights) return;
+        
+        const avg = d3.mean(data, d => d.y);
+        const max = d3.max(data, d => d.y);
+        const min = d3.min(data, d => d.y);
+        
+        insights.innerHTML = \`
+            <div class="insight-item">
+                <strong>Average:</strong> \${avg.toFixed(2)}
+            </div>
+            <div class="insight-item">
+                <strong>Maximum:</strong> \${max.toFixed(2)}
+            </div>
+            <div class="insight-item">
+                <strong>Minimum:</strong> \${min.toFixed(2)}
+            </div>
+            <div class="insight-item">
+                <strong>Range:</strong> \${(max - min).toFixed(2)}
+            </div>
+        \`;
+    }
+    
+    function showTooltip(event, d) {
+        const tooltip = d3.select('body').append('div')
+            .attr('class', 'tooltip')
+            .style('position', 'absolute')
+            .style('background', 'rgba(0, 0, 0, 0.8)')
+            .style('color', 'white')
+            .style('padding', '8px 12px')
+            .style('border-radius', '4px')
+            .style('font-size', '12px')
+            .style('pointer-events', 'none')
+            .style('opacity', 0);
+            
+        tooltip.html(\`Value: \${d.y.toFixed(2)}<br>Category: \${d.category}\`)
+            .style('left', (event.pageX + 10) + 'px')
+            .style('top', (event.pageY - 10) + 'px')
+            .transition()
+            .duration(200)
+            .style('opacity', 1);
+    }
+    
+    function hideTooltip() {
+        d3.selectAll('.tooltip').remove();
+    }`;
+    }
+
+    generateInteractiveJS() {
+        return `
+    // Advanced Interactive Demo Logic
+    let activeFeature = null;
+    let demoData = {};
+    
+    function initializeInteractiveDemo() {
+        setupFeatureCards();
+        setupDemoArea();
+        bindInteractiveEvents();
+        loadDemoPresets();
+    }
+    
+    function setupFeatureCards() {
+        const cards = document.querySelectorAll('.feature-card');
+        cards.forEach(card => {
+            card.addEventListener('click', () => activateFeature(card.dataset.feature));
+            
+            // Add hover effects
+            card.addEventListener('mouseenter', () => {
+                Utils.animate(card, [
+                    { transform: 'translateY(0) scale(1)' },
+                    { transform: 'translateY(-8px) scale(1.02)' }
+                ], { duration: 200 });
+            });
+            
+            card.addEventListener('mouseleave', () => {
+                if (card.dataset.feature !== activeFeature) {
+                    Utils.animate(card, [
+                        { transform: 'translateY(-8px) scale(1.02)' },
+                        { transform: 'translateY(0) scale(1)' }
+                    ], { duration: 200 });
+                }
+            });
+        });
+    }
+    
+    function setupDemoArea() {
+        const canvas = document.getElementById('demoCanvas');
+        if (!canvas) return;
+        
+        // Add resize observer for responsive updates
+        if ('ResizeObserver' in window) {
+            const resizeObserver = new ResizeObserver(entries => {
+                for (let entry of entries) {
+                    updateCanvasSize(entry.contentRect);
+                }
+            });
+            resizeObserver.observe(canvas);
+        }
+    }
+    
+    function activateFeature(featureId) {
+        if (activeFeature === featureId) return;
+        
+        activeFeature = featureId;
+        
+        // Update UI state
+        document.querySelectorAll('.feature-card').forEach(card => {
+            card.classList.toggle('active', card.dataset.feature === featureId);
+        });
+        
+        // Update demo title
+        const titles = {
+            realtime: 'Real-time Data Streaming',
+            customization: 'Personalization Settings',
+            analytics: 'Advanced Analytics Dashboard'
+        };
+        
+        document.getElementById('demoTitle').textContent = titles[featureId] || 'Feature Demo';
+        
+        // Load feature content
+        loadFeatureContent(featureId);
+        
+        // Update controls
+        updateControlPanel(featureId);
+        
+        showNotification(\`Activated \${titles[featureId]}\`, 'success');
+    }
+    
+    function loadFeatureContent(featureId) {
+        const canvas = document.getElementById('demoCanvas');
+        if (!canvas) return;
+        
+        canvas.innerHTML = '';
+        
+        switch (featureId) {
+            case 'realtime':
+                loadRealtimeDemo(canvas);
+                break;
+            case 'customization':
+                loadCustomizationDemo(canvas);
+                break;
+            case 'analytics':
+                loadAnalyticsDemo(canvas);
+                break;
+        }
+    }
+    
+    function loadRealtimeDemo(canvas) {
+        canvas.innerHTML = \`
+            <div class="realtime-demo">
+                <div class="data-stream">
+                    <h3>Live Data Stream</h3>
+                    <div class="stream-container" id="streamContainer">
+                        <div class="stream-item">Initializing...</div>
+                    </div>
+                </div>
+                <div class="metrics-panel">
+                    <div class="metric">
+                        <span class="metric-label">Updates/sec</span>
+                        <span class="metric-value" id="updateRate">0</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Total Points</span>
+                        <span class="metric-value" id="totalPoints">0</span>
+                    </div>
+                </div>
+            </div>
+        \`;
+        
+        startRealtimeUpdates();
+    }
+    
+    function loadCustomizationDemo(canvas) {
+        canvas.innerHTML = \`
+            <div class="customization-demo">
+                <div class="customization-panel">
+                    <h3>Personalization Options</h3>
+                    <div class="option-group">
+                        <label>Color Scheme</label>
+                        <div class="color-options">
+                            <button class="color-option" data-color="blue" style="background: #3498db"></button>
+                            <button class="color-option" data-color="green" style="background: #2ecc71"></button>
+                            <button class="color-option" data-color="purple" style="background: #9b59b6"></button>
+                            <button class="color-option" data-color="orange" style="background: #f39c12"></button>
+                        </div>
+                    </div>
+                    <div class="option-group">
+                        <label>Layout Style</label>
+                        <select id="layoutStyle">
+                            <option value="grid">Grid Layout</option>
+                            <option value="list">List Layout</option>
+                            <option value="card">Card Layout</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="preview-area" id="customPreview">
+                    <div class="sample-content">
+                        <h4>Sample Content</h4>
+                        <p>This area will reflect your customization choices.</p>
+                    </div>
+                </div>
+            </div>
+        \`;
+        
+        bindCustomizationEvents();
+    }
+    
+    function loadAnalyticsDemo(canvas) {
+        canvas.innerHTML = \`
+            <div class="analytics-demo">
+                <div class="analytics-grid">
+                    <div class="analytics-card">
+                        <h4>Performance</h4>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 75%"></div>
+                        </div>
+                        <span class="analytics-value">75%</span>
+                    </div>
+                    <div class="analytics-card">
+                        <h4>Engagement</h4>
+                        <div class="chart-mini" id="engagementChart"></div>
+                    </div>
+                    <div class="analytics-card">
+                        <h4>Growth</h4>
+                        <div class="stat-number">+23%</div>
+                        <div class="stat-trend">↗️ Trending up</div>
+                    </div>
+                </div>
+                <div class="detailed-analytics">
+                    <canvas id="analyticsCanvas" width="400" height="200"></canvas>
+                </div>
+            </div>
+        \`;
+        
+        initializeAnalyticsCharts();
+    }
+    
+    function startRealtimeUpdates() {
+        let updateCount = 0;
+        let totalPoints = 0;
+        
+        const updateInterval = setInterval(() => {
+            if (activeFeature !== 'realtime') {
+                clearInterval(updateInterval);
+                return;
+            }
+            
+            const container = document.getElementById('streamContainer');
+            if (!container) return;
+            
+            const newData = {
+                timestamp: new Date().toLocaleTimeString(),
+                value: Math.random() * 100,
+                type: ['INFO', 'SUCCESS', 'WARNING'][Math.floor(Math.random() * 3)]
+            };
+            
+            const streamItem = document.createElement('div');
+            streamItem.className = \`stream-item \${newData.type.toLowerCase()}\`;
+            streamItem.innerHTML = \`
+                <span class="timestamp">\${newData.timestamp}</span>
+                <span class="value">\${newData.value.toFixed(2)}</span>
+                <span class="type">\${newData.type}</span>
+            \`;
+            
+            container.insertBefore(streamItem, container.firstChild);
+            
+            // Limit to 10 items
+            while (container.children.length > 10) {
+                container.removeChild(container.lastChild);
+            }
+            
+            updateCount++;
+            totalPoints += newData.value;
+            
+            document.getElementById('updateRate').textContent = (updateCount / 10).toFixed(1);
+            document.getElementById('totalPoints').textContent = totalPoints.toFixed(0);
+            
+            Utils.animate(streamItem, [
+                { opacity: 0, transform: 'translateX(-20px)' },
+                { opacity: 1, transform: 'translateX(0)' }
+            ]);
+            
+        }, 1000);
+    }
+    
+    function bindCustomizationEvents() {
+        document.querySelectorAll('.color-option').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const color = e.target.dataset.color;
+                applyColorScheme(color);
+            });
+        });
+        
+        document.getElementById('layoutStyle')?.addEventListener('change', (e) => {
+            applyLayoutStyle(e.target.value);
+        });
+    }
+    
+    function applyColorScheme(scheme) {
+        const colors = {
+            blue: '#3498db',
+            green: '#2ecc71',
+            purple: '#9b59b6',
+            orange: '#f39c12'
+        };
+        
+        const preview = document.getElementById('customPreview');
+        if (preview) {
+            preview.style.accentColor = colors[scheme];
+            preview.style.borderLeftColor = colors[scheme];
+            preview.style.borderLeftWidth = '4px';
+            preview.style.borderLeftStyle = 'solid';
+        }
+        
+        showNotification(\`Applied \${scheme} color scheme\`, 'success');
+    }
+    
+    function applyLayoutStyle(style) {
+        const preview = document.getElementById('customPreview');
+        if (!preview) return;
+        
+        preview.className = \`preview-area layout-\${style}\`;
+        showNotification(\`Applied \${style} layout\`, 'success');
+    }
+    
+    function initializeAnalyticsCharts() {
+        const canvas = document.getElementById('analyticsCanvas');
+        if (!canvas) return;
+        
+        const ctx = canvas.getContext('2d');
+        const data = Array.from({length: 20}, () => Math.random() * 100);
+        
+        // Simple line chart
+        ctx.strokeStyle = '#4ecdc4';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        
+        data.forEach((point, index) => {
+            const x = (index / (data.length - 1)) * canvas.width;
+            const y = canvas.height - (point / 100) * canvas.height;
+            
+            if (index === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
             }
         });
-    });
-});
-
-// Add CSS for the interactive elements
-const style = document.createElement('style');
-style.textContent = \`
-    .loading-dots span {
-        animation: loading 1.4s infinite;
-    }
-    .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
-    .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
-    
-    @keyframes loading {
-        0%, 60%, 100% { opacity: 0; }
-        30% { opacity: 1; }
-    }
-    
-    .metric {
-        display: flex;
-        align-items: center;
-        gap: 15px;
-        margin: 15px 0;
-    }
-    
-    .label {
-        min-width: 120px;
-        font-weight: 600;
-    }
-    
-    .bar {
-        flex: 1;
-        height: 20px;
-        background: #e0e0e0;
-        border-radius: 10px;
-        overflow: hidden;
-    }
-    
-    .fill {
-        height: 100%;
-        background: linear-gradient(90deg, #4ecdc4, #44a08d);
-        transition: width 1s ease;
-    }
-    
-    .related-item {
-        background: #f8f9fa;
-        padding: 15px;
-        margin: 10px 0;
-        border-radius: 10px;
-        border-left: 4px solid #4ecdc4;
-    }
-    
-    .related-score {
-        color: #666;
-        font-size: 0.9rem;
-    }
-\`;
-document.head.appendChild(style);`;
-        }
-    }
-    
-    getContentType() {
-        const title = this.story.title.toLowerCase();
         
-        if (title.includes('data') || title.includes('chart') || title.includes('graph') || title.includes('visualization')) {
-            return 'data-visualization';
-        } else if (title.includes('demo') || title.includes('app') || title.includes('tool') || title.includes('interactive')) {
-            return 'interactive-demo';
-        } else {
-            return 'article-analysis';
+        ctx.stroke();
+    }
+    
+    function updateControlPanel(featureId) {
+        const panel = document.getElementById('controlPanel');
+        if (!panel) return;
+        
+        const controls = {
+            realtime: \`
+                <button class="control-item" id="pauseStream">Pause Stream</button>
+                <button class="control-item" id="clearStream">Clear Data</button>
+                <div class="control-item">
+                    <label>Update Rate</label>
+                    <input type="range" id="updateRate" min="500" max="3000" value="1000">
+                </div>
+            \`,
+            customization: \`
+                <button class="control-item" id="resetCustom">Reset to Default</button>
+                <button class="control-item" id="saveCustom">Save Settings</button>
+                <div class="control-item">
+                    <label>Animation Speed</label>
+                    <input type="range" id="animSpeed" min="0.5" max="2" step="0.1" value="1">
+                </div>
+            \`,
+            analytics: \`
+                <button class="control-item" id="refreshAnalytics">Refresh Data</button>
+                <button class="control-item" id="exportAnalytics">Export Report</button>
+                <div class="control-item">
+                    <label>Time Range</label>
+                    <select id="timeRange">
+                        <option value="1h">Last Hour</option>
+                        <option value="24h">Last 24 Hours</option>
+                        <option value="7d">Last 7 Days</option>
+                    </select>
+                </div>
+            \`
+        };
+        
+        panel.innerHTML = controls[featureId] || '';
+        
+        // Bind new control events
+        bindControlEvents(featureId);
+    }
+    
+    function bindControlEvents(featureId) {
+        // Feature-specific control bindings would go here
+        // This is a simplified version
+        
+        document.querySelectorAll('.control-item').forEach(control => {
+            if (control.tagName === 'BUTTON') {
+                control.addEventListener('click', (e) => {
+                    handleControlAction(e.target.id, featureId);
+                });
+            }
+        });
+    }
+    
+    function handleControlAction(actionId, featureId) {
+        const actions = {
+            pauseStream: () => showNotification('Stream paused', 'info'),
+            clearStream: () => {
+                const container = document.getElementById('streamContainer');
+                if (container) container.innerHTML = '<div class="stream-item">Stream cleared</div>';
+            },
+            resetCustom: () => showNotification('Reset to defaults', 'info'),
+            saveCustom: () => {
+                saveSettings();
+                showNotification('Settings saved', 'success');
+            },
+            refreshAnalytics: () => {
+                initializeAnalyticsCharts();
+                showNotification('Analytics refreshed', 'success');
+            },
+            exportAnalytics: () => showNotification('Report exported', 'success')
+        };
+        
+        if (actions[actionId]) {
+            actions[actionId]();
         }
     }
     
-    getComplexity() {
-        return this.story.score > 200 ? 'High' : this.story.score > 50 ? 'Medium' : 'Low';
+    function loadDemoPresets() {
+        // Load any saved demo presets
+        demoData = {
+            realtime: { updateRate: 1000, maxItems: 10 },
+            customization: { theme: 'blue', layout: 'grid' },
+            analytics: { timeRange: '24h', charts: ['line', 'bar'] }
+        };
     }
     
-    getRecommendedUI() {
-        const contentType = this.getContentType();
-        if (contentType === 'data-visualization') return 'Interactive Charts & Graphs';
-        if (contentType === 'interactive-demo') return 'Feature Showcase with Live Demo';
-        return 'Content Analysis Dashboard';
+    function updateCanvasSize(rect) {
+        // Handle responsive canvas updates
+        if (activeFeature && rect.width > 0) {
+            // Trigger re-render based on new size
+            setTimeout(() => loadFeatureContent(activeFeature), 100);
+        }
     }
     
+    function showHelp() {
+        const helpText = \`
+            <h3>Interactive Demo Help</h3>
+            <ul>
+                <li><strong>Real-time:</strong> Shows live data streaming</li>
+                <li><strong>Customization:</strong> Personalize the interface</li>
+                <li><strong>Analytics:</strong> View detailed insights</li>
+            </ul>
+            <p>Use the controls on the left to adjust settings.</p>
+        \`;
+        
+        showNotification(helpText, 'info');
+    }`;
+    }
+
+    renderAnalysisPanel(analysisText) {
+        const container = document.getElementById('codePanels');
+        
+        const panel = document.createElement('div');
+        panel.className = 'analysis-panel';
+        panel.innerHTML = `
+            <div class="code-header">
+                <span>🔍</span>
+                <span>Story Analysis</span>
+            </div>
+            <div class="analysis-content">
+                <pre>${analysisText}</pre>
+            </div>
+        `;
+        
+        container.appendChild(panel);
+    }
+
+    renderDesignPanel() {
+        const container = document.getElementById('codePanels');
+        
+        const panel = document.createElement('div');
+        panel.className = 'design-panel';
+        panel.innerHTML = `
+            <div class="code-header">
+                <span>🎨</span>
+                <span>Design Concept</span>
+            </div>
+            <div class="design-content">
+                <h4>Layout: ${this.designConcept.layout}</h4>
+                <h4>Components:</h4>
+                <ul>${this.designConcept.components.map(c => `<li>${c}</li>`).join('')}</ul>
+                <h4>Interactions:</h4>
+                <ul>${this.designConcept.interactions.map(i => `<li>${i}</li>`).join('')}</ul>
+            </div>
+        `;
+        
+        container.appendChild(panel);
+    }
+
+    renderAssetPanel(name, url, description) {
+        const container = document.getElementById('codePanels');
+        
+        const panel = document.createElement('div');
+        panel.className = 'asset-panel';
+        panel.innerHTML = `
+            <div class="code-header">
+                <span>🖼️</span>
+                <span>Generated Asset: ${name}</span>
+            </div>
+            <div class="asset-content">
+                <div class="asset-preview">
+                    <img src="${url}" alt="${description}" style="max-width: 100%; height: auto; border-radius: 8px;">
+                </div>
+                <p class="asset-description">${description}</p>
+                <div class="asset-meta">
+                    <small>Generated: ${new Date().toLocaleTimeString()}</small>
+                </div>
+            </div>
+        `;
+        
+        container.appendChild(panel);
+    }
+
     renderBuildSteps() {
         const container = document.getElementById('buildSteps');
         container.innerHTML = this.buildSteps.map(step => `
@@ -974,4 +2073,3 @@ document.head.appendChild(style);`;
 
 // Initialize the application
 new HackerNewsAI();
-
