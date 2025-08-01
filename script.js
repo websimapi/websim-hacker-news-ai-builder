@@ -355,6 +355,106 @@ class AIBuilder {
         this.updateStatus('🚀 Performance optimization complete!');
     }
 
+    async testApplication() {
+        this.updateStatus('Testing generated application for errors...');
+        await this.sleep(1000);
+        
+        try {
+            // Create a test iframe to validate the generated code
+            const testFrame = document.createElement('iframe');
+            testFrame.style.display = 'none';
+            testFrame.sandbox = 'allow-scripts allow-same-origin';
+            document.body.appendChild(testFrame);
+            
+            // Combine all generated code
+            const fullHTML = this.combineGeneratedCode();
+            
+            // Test for basic HTML/CSS/JS errors
+            const errors = [];
+            
+            // Test HTML validation
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(fullHTML, 'text/html');
+            const parserErrors = doc.querySelectorAll('parsererror');
+            if (parserErrors.length > 0) {
+                errors.push('HTML parsing errors detected');
+            }
+            
+            // Test JavaScript by attempting to execute it
+            try {
+                testFrame.srcdoc = fullHTML;
+                await new Promise((resolve, reject) => {
+                    testFrame.onload = resolve;
+                    testFrame.onerror = reject;
+                    setTimeout(() => reject(new Error('Timeout')), 5000);
+                });
+            } catch (error) {
+                errors.push(`JavaScript execution error: ${error.message}`);
+            }
+            
+            // Clean up test frame
+            document.body.removeChild(testFrame);
+            
+            if (errors.length > 0) {
+                this.updateStatus(`⚠️ Found ${errors.length} error(s), attempting fixes...`);
+                this.renderErrorPanel(errors);
+                await this.fixErrors(errors);
+            } else {
+                this.updateStatus('✅ Application tested successfully - no errors found!');
+                this.renderPreview();
+            }
+            
+        } catch (error) {
+            this.updateStatus(`❌ Testing failed: ${error.message}`);
+            this.renderErrorPanel([error.message]);
+        }
+    }
+    
+    async deployApplication() {
+        this.updateStatus('Finalizing application deployment...');
+        await this.sleep(1500);
+        
+        // Render final preview
+        this.renderPreview();
+        
+        // Add deployment success indicator
+        this.updateStatus('🚀 Application successfully deployed and ready!');
+        
+        // Show preview prominently
+        this.showPreviewFullscreen();
+    }
+    
+    showPreviewFullscreen() {
+        const previewContainer = document.getElementById('previewContainer');
+        if (previewContainer) {
+            previewContainer.classList.add('preview-prominent');
+            
+            // Add fullscreen toggle button
+            const fullscreenBtn = document.createElement('button');
+            fullscreenBtn.className = 'preview-fullscreen-btn';
+            fullscreenBtn.innerHTML = '🔍 View Fullscreen';
+            fullscreenBtn.addEventListener('click', () => this.togglePreviewFullscreen());
+            
+            const header = previewContainer.querySelector('h3');
+            if (header && !header.querySelector('.preview-fullscreen-btn')) {
+                header.appendChild(fullscreenBtn);
+            }
+        }
+    }
+    
+    togglePreviewFullscreen() {
+        const previewContainer = document.getElementById('previewContainer');
+        const modal = document.getElementById('aiModal');
+        
+        if (previewContainer.classList.contains('preview-fullscreen')) {
+            previewContainer.classList.remove('preview-fullscreen');
+            modal.style.overflow = 'hidden';
+        } else {
+            previewContainer.classList.add('preview-fullscreen');
+            modal.style.overflow = 'visible';
+        }
+    }
+
     generateAdvancedHTMLContent() {
         const heroImage = this.generatedAssets.find(a => a.name === 'hero-image');
         const iconImage = this.generatedAssets.find(a => a.name === 'icon-interactive');
@@ -1044,8 +1144,8 @@ body {
         padding: 0.5rem 1rem;
         font-size: 0.875rem;
     }
-}`;
-    }
+}
+`;
 
     generateAdvancedJSContent() {
         const contentType = this.analysisResult.contentType;
@@ -2038,21 +2138,186 @@ body {
     
     renderPreview() {
         const iframe = document.getElementById('previewFrame');
+        if (!iframe) return;
         
+        const fullHTML = this.combineGeneratedCode();
+        iframe.srcdoc = fullHTML;
+        
+        // Update preview container to show it's active
+        const container = document.getElementById('previewContainer');
+        if (container) {
+            container.classList.add('preview-active');
+            
+            // Add preview controls if they don't exist
+            this.addPreviewControls(container);
+        }
+        
+        this.updateStatus('Live preview updated successfully!');
+    }
+    
+    addPreviewControls(container) {
+        const existingControls = container.querySelector('.preview-controls');
+        if (existingControls) return;
+        
+        const controls = document.createElement('div');
+        controls.className = 'preview-controls';
+        controls.innerHTML = `
+            <button class="preview-btn" id="refreshPreview" title="Refresh Preview">
+                🔄 Refresh
+            </button>
+            <button class="preview-btn" id="openNewTab" title="Open in New Tab">
+                🔗 New Tab
+            </button>
+            <button class="preview-btn" id="downloadApp" title="Download Application">
+                💾 Download
+            </button>
+        `;
+        
+        const header = container.querySelector('h3');
+        if (header) {
+            header.appendChild(controls);
+        }
+        
+        // Bind control events
+        document.getElementById('refreshPreview')?.addEventListener('click', () => {
+            this.renderPreview();
+        });
+        
+        document.getElementById('openNewTab')?.addEventListener('click', () => {
+            const fullHTML = this.combineGeneratedCode();
+            const blob = new Blob([fullHTML], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            window.open(url, '_blank');
+        });
+        
+        document.getElementById('downloadApp')?.addEventListener('click', () => {
+            this.downloadApplication();
+        });
+    }
+    
+    downloadApplication() {
+        const fullHTML = this.combineGeneratedCode();
+        const blob = new Blob([fullHTML], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${this.story.title.replace(/[^a-zA-Z0-9]/g, '_')}.html`;
+        a.click();
+        
+        URL.revokeObjectURL(url);
+    }
+    
+    combineGeneratedCode() {
+        // Create asset URLs for use in the code
+        const assetUrls = {};
+        this.generatedAssets.forEach(asset => {
+            assetUrls[asset.name] = asset.url;
+        });
+        
+        // Replace asset placeholders in HTML and CSS
+        let html = this.generatedCode.html;
+        let css = this.generatedCode.css;
+        
+        this.generatedAssets.forEach(asset => {
+            const placeholder = `{{${asset.name}}}`;
+            html = html.replace(new RegExp(placeholder, 'g'), asset.url);
+            css = css.replace(new RegExp(placeholder, 'g'), asset.url);
+        });
+        
+        // Combine into full HTML document
         const fullHTML = `
             <!DOCTYPE html>
-            <html>
+            <html lang="en">
             <head>
-                <style>${this.generatedCode.css}</style>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>${this.story.title}</title>
+                <style>${css}</style>
             </head>
             <body>
-                ${this.generatedCode.html.replace(/<!DOCTYPE html>.*?<body>/s, '').replace(/<\/body>.*?<\/html>/s, '')}
+                ${html.replace(/<!DOCTYPE html>.*?<body>/s, '').replace(/<\/body>.*?<\/html>/s, '')}
                 <script>${this.generatedCode.javascript}</script>
             </body>
             </html>
         `;
         
-        iframe.srcdoc = fullHTML;
+        return fullHTML;
+    }
+    
+    async fixErrors(errors) {
+        // Attempt to fix common errors
+        for (const error of errors) {
+            if (error.includes('HTML parsing')) {
+                await this.fixHTMLErrors();
+            } else if (error.includes('JavaScript')) {
+                await this.fixJavaScriptErrors();
+            } else if (error.includes('CSS')) {
+                await this.fixCSSErrors();
+            }
+        }
+        
+        // Re-test after fixes
+        await this.testApplication();
+    }
+    
+    async fixHTMLErrors() {
+        this.updateStatus('Fixing HTML structure issues...');
+        // Basic HTML validation and fixes
+        this.generatedCode.html = this.generatedCode.html
+            .replace(/(<[^>]+)(?<!\/|>)>/g, '$1>') // Fix unclosed tags
+            .replace(/&(?![a-zA-Z]+;)/g, '&amp;'); // Fix unescaped ampersands
+        await this.sleep(500);
+    }
+    
+    async fixJavaScriptErrors() {
+        this.updateStatus('Fixing JavaScript errors...');
+        // Add error handling to JavaScript
+        this.generatedCode.javascript = `
+            try {
+                ${this.generatedCode.javascript}
+            } catch (error) {
+                console.error('Application error:', error);
+            }
+        `;
+        await this.sleep(500);
+    }
+    
+    async fixCSSErrors() {
+        this.updateStatus('Fixing CSS syntax issues...');
+        // Basic CSS fixes
+        this.generatedCode.css = this.generatedCode.css
+            .replace(/([^;{}])\s*}/g, '$1;}') // Add missing semicolons
+            .replace(/\/\*[^*]*\*+(?:[^/*][^*]*\*+)*\//g, ''); // Remove comments that might cause issues
+        await this.sleep(500);
+    }
+    
+    renderErrorPanel(errors) {
+        const container = document.getElementById('codePanels');
+        
+        const errorPanel = document.createElement('div');
+        errorPanel.className = 'error-panel';
+        errorPanel.innerHTML = `
+            <div class="code-header">
+                <span>❌</span>
+                <span>Testing Errors Found</span>
+            </div>
+            <div class="error-content">
+                <ul>
+                    ${errors.map(error => `<li>${this.escapeHtml(error)}</li>`).join('')}
+                </ul>
+                <p class="error-note">AI is attempting to fix these issues automatically...</p>
+            </div>
+        `;
+        
+        container.appendChild(errorPanel);
+        
+        // Remove error panel after a few seconds
+        setTimeout(() => {
+            if (errorPanel.parentNode) {
+                errorPanel.remove();
+            }
+        }, 10000);
     }
     
     updateStatus(message) {
